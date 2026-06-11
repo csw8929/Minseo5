@@ -1,21 +1,16 @@
 package com.example.minseo5.util;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import android.content.Context;
+import android.util.Log;
+
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class SmsParser {
-
-    private static final Pattern AMOUNT_PATTERN =
-            Pattern.compile("(\\d[\\d,]*)원");
-    private static final Pattern BANK_TRANSFER =
-            Pattern.compile("(.{1,20}?)(?:에서|로부터)\\s*(?:보냄|입금|이체)");
-    private static final Pattern CARD_MERCHANT =
-            Pattern.compile("승인[^가-힣A-Za-z0-9]*([가-힣A-Za-z0-9][가-힣A-Za-z0-9\\s]{1,15})");
-    private static final Pattern WEB_MERCHANT =
-            Pattern.compile("\\[Web발신\\]\\s*[^\\n]*?([가-힣A-Za-z0-9]{2,})");
 
     public static class ParseResult {
         public String usedDate;
@@ -23,40 +18,73 @@ public class SmsParser {
         public String purpose;
     }
 
-    public static ParseResult parse(String address, String body, long timestamp) {
-        ParseResult result = new ParseResult();
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.KOREA);
-        result.usedDate = sdf.format(new Date(timestamp));
+    public static List<ParseResult> parseAll(Context context, String text) {
+        List<ParseResult> out = new ArrayList<>();
+        if (text == null || text.trim().isEmpty()) return out;
 
-        if (body != null) {
-            Matcher m = AMOUNT_PATTERN.matcher(body);
-            if (m.find()) {
-                try {
-                    result.amount = Long.parseLong(m.group(1).replace(",", ""));
-                } catch (NumberFormatException ignored) {
-                }
+        RuleConfig cfg = RuleStore.get(context);
+        if (cfg.rules == null) return out;
+
+        for (RuleConfig.Rule rule : cfg.rules) {
+            if (rule == null || rule.pattern == null) continue;
+            Pattern pattern;
+            try {
+                pattern = Pattern.compile(rule.pattern);
+            } catch (Exception e) {
+                Log.e("MINSEO5", "룰 정규식 오류: " + rule.name, e);
+                continue;
             }
-            result.purpose = extractPurpose(address, body);
-        } else {
-            result.purpose = address != null ? address : "";
+            Matcher m = pattern.matcher(text);
+            while (m.find()) {
+                ParseResult r = new ParseResult();
+                r.amount = toAmount(group(m, rule.amountGroup));
+                r.usedDate = toDate(group(m, rule.monthGroup), group(m, rule.dayGroup),
+                        cfg.yearInference);
+                String purpose = group(m, rule.purposeGroup);
+                r.purpose = purpose != null ? purpose.trim() : "";
+                out.add(r);
+            }
         }
-
-        return result;
+        return out;
     }
 
-    private static String extractPurpose(String address, String body) {
-        Matcher m = BANK_TRANSFER.matcher(body);
-        if (m.find()) return m.group(1).trim();
+    private static String group(Matcher m, int idx) {
+        if (idx <= 0 || idx > m.groupCount()) return null;
+        return m.group(idx);
+    }
 
-        m = CARD_MERCHANT.matcher(body);
-        if (m.find()) {
-            String candidate = m.group(1).trim();
-            if (candidate.length() >= 2) return candidate;
+    private static long toAmount(String s) {
+        if (s == null) return 0;
+        try {
+            return Long.parseLong(s.replace(",", "").trim());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    private static String toDate(String mm, String dd, String mode) {
+        Calendar today = Calendar.getInstance();
+        if (mm == null || dd == null) {
+            return String.format(Locale.KOREA, "%04d-%02d-%02d",
+                    today.get(Calendar.YEAR), today.get(Calendar.MONTH) + 1,
+                    today.get(Calendar.DAY_OF_MONTH));
+        }
+        int month, day;
+        try {
+            month = Integer.parseInt(mm.trim());
+            day = Integer.parseInt(dd.trim());
+        } catch (NumberFormatException e) {
+            return String.format(Locale.KOREA, "%04d-%02d-%02d",
+                    today.get(Calendar.YEAR), today.get(Calendar.MONTH) + 1,
+                    today.get(Calendar.DAY_OF_MONTH));
         }
 
-        m = WEB_MERCHANT.matcher(body);
-        if (m.find()) return m.group(1).trim();
-
-        return address != null ? address : "";
+        int year = today.get(Calendar.YEAR);
+        if ("recentPast".equals(mode)) {
+            Calendar candidate = Calendar.getInstance();
+            candidate.set(year, month - 1, day, 23, 59, 59);
+            if (candidate.after(today)) year -= 1;
+        }
+        return String.format(Locale.KOREA, "%04d-%02d-%02d", year, month, day);
     }
 }

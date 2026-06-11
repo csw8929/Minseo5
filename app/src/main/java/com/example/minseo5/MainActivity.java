@@ -1,12 +1,13 @@
 package com.example.minseo5;
 
-import android.Manifest;
 import android.content.Intent;
-import android.content.pm.PackageManager;
+import android.os.Build;
+import android.os.Environment;
+import android.provider.Settings;
+import android.view.WindowInsets;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.MenuItem;
-import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -14,8 +15,6 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
-import androidx.core.view.WindowCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -25,6 +24,8 @@ import com.example.minseo5.db.SpendingRecord;
 import com.example.minseo5.ui.SpendingAdapter;
 import com.example.minseo5.ui.SpendingEntryDialog;
 import com.example.minseo5.util.JsonExportImport;
+import com.example.minseo5.util.RuleStore;
+import com.google.android.material.appbar.AppBarLayout;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
@@ -41,15 +42,6 @@ public class MainActivity extends AppCompatActivity {
     private Calendar currentMonth;
     private TextView tvMonth, tvTotal;
 
-    private final ActivityResultLauncher<String> smsPermissionLauncher =
-            registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
-                if (granted) {
-                    startSmsPickerActivity();
-                } else {
-                    Toast.makeText(this, "SMS 권한이 필요합니다", Toast.LENGTH_SHORT).show();
-                }
-            });
-
     private final ActivityResultLauncher<String> exportLauncher =
             registerForActivityResult(new ActivityResultContracts.CreateDocument("application/json"), uri -> {
                 if (uri != null) exportData(uri);
@@ -60,10 +52,24 @@ public class MainActivity extends AppCompatActivity {
                 if (uri != null) importData(uri);
             });
 
+    private final ActivityResultLauncher<Intent> smsPickerLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                    String date = result.getData().getStringExtra(SmsPickerActivity.RESULT_DATE);
+                    if (date != null && date.length() >= 7) {
+                        try {
+                            currentMonth.set(Calendar.YEAR, Integer.parseInt(date.substring(0, 4)));
+                            currentMonth.set(Calendar.MONTH, Integer.parseInt(date.substring(5, 7)) - 1);
+                        } catch (NumberFormatException ignored) {
+                        }
+                    }
+                }
+                loadData();
+            });
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
         setContentView(R.layout.activity_main);
 
         dao = SpendingDatabase.getInstance(this).spendingDao();
@@ -93,13 +99,65 @@ public class MainActivity extends AppCompatActivity {
         FloatingActionButton fab = findViewById(R.id.fab_add);
         fab.setOnClickListener(v -> showAddOptions());
 
+        AppBarLayout appBar = findViewById(R.id.appbar);
+        int fabMarginBase = getResources().getDimensionPixelSize(R.dimen.fab_margin);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            WindowInsets wi = getWindowManager().getCurrentWindowMetrics().getWindowInsets();
+            int top = wi.getInsets(WindowInsets.Type.statusBars()).top;
+            int bottom = wi.getInsets(WindowInsets.Type.navigationBars()).bottom;
+            appBar.setPadding(0, top, 0, 0);
+            fab.post(() -> fab.setTranslationY(-bottom));
+        }
+
         loadData();
+
+        ensureStorageAccess();
+        RuleStore.get(this);
+
+        if (savedInstanceState == null) {
+            handleSendIntent(getIntent());
+        }
+    }
+
+    private void ensureStorageAccess() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return;
+        if (Environment.isExternalStorageManager()) return;
+        new AlertDialog.Builder(this)
+                .setTitle("파일 접근 권한")
+                .setMessage("룰/데이터 파일(Documents/Minseo5)을 읽고 쓰려면 '모든 파일 액세스' 권한이 필요합니다. 없으면 기본 룰로만 동작합니다.")
+                .setPositiveButton("설정 열기", (d, w) -> {
+                    Intent intent = new Intent(
+                            Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                            Uri.parse("package:" + getPackageName()));
+                    startActivity(intent);
+                })
+                .setNegativeButton("나중에", null)
+                .show();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleSendIntent(intent);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         loadData();
+        RuleStore.reload(this);
+    }
+
+    private void handleSendIntent(Intent intent) {
+        if (intent == null || !Intent.ACTION_SEND.equals(intent.getAction())) return;
+        String text = intent.getStringExtra(Intent.EXTRA_TEXT);
+        intent.setAction(null);
+        if (text == null || text.trim().isEmpty()) return;
+
+        Intent target = new Intent(this, SmsPickerActivity.class);
+        target.putExtra(SmsPickerActivity.EXTRA_RAW_TEXT, text);
+        smsPickerLauncher.launch(target);
     }
 
     private void loadData() {
@@ -115,24 +173,23 @@ public class MainActivity extends AppCompatActivity {
     private void showAddOptions() {
         new AlertDialog.Builder(this)
                 .setTitle("추가 방법 선택")
-                .setItems(new CharSequence[]{"문자에서 선택", "직접 입력"}, (dialog, which) -> {
-                    if (which == 0) requestSmsAndPick();
+                .setItems(new CharSequence[]{"문자에서 가져오기", "직접 입력"}, (dialog, which) -> {
+                    if (which == 0) openMessagingApp();
                     else openManualEntry();
                 })
                 .show();
     }
 
-    private void requestSmsAndPick() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_SMS)
-                == PackageManager.PERMISSION_GRANTED) {
-            startSmsPickerActivity();
+    private void openMessagingApp() {
+        Intent intent = new Intent(Intent.ACTION_MAIN);
+        intent.addCategory(Intent.CATEGORY_APP_MESSAGING);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        if (intent.resolveActivity(getPackageManager()) != null) {
+            Toast.makeText(this, "메시지를 길게 눌러 공유 → 용돈 기록 선택", Toast.LENGTH_LONG).show();
+            startActivity(intent);
         } else {
-            smsPermissionLauncher.launch(Manifest.permission.READ_SMS);
+            Toast.makeText(this, "메시지 앱을 찾을 수 없습니다", Toast.LENGTH_SHORT).show();
         }
-    }
-
-    private void startSmsPickerActivity() {
-        startActivity(new Intent(this, SmsPickerActivity.class));
     }
 
     private void openManualEntry() {

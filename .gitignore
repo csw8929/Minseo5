@@ -13,3 +13,7 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# 개인 데이터 (단말에서 pull 한 실제 문자/지출 데이터 — 커밋 금지)
+/tools/data.json
+/docs/20260611_sms_01055232287.md
