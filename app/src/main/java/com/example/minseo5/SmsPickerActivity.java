@@ -4,13 +4,14 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
-import android.provider.Telephony;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.WindowCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
+import com.google.android.material.appbar.MaterialToolbar;
 
 import com.example.minseo5.db.SpendingDao;
 import com.example.minseo5.db.SpendingDatabase;
@@ -28,7 +29,13 @@ public class SmsPickerActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
         setContentView(R.layout.activity_sms_picker);
+
+        MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        toolbar.setNavigationOnClickListener(v -> finish());
 
         RecyclerView rv = findViewById(R.id.rv_sms);
         rv.setLayoutManager(new LinearLayoutManager(this));
@@ -44,18 +51,21 @@ public class SmsPickerActivity extends AppCompatActivity {
         Uri uri = Uri.parse("content://sms/inbox");
         String[] projection = {"address", "body", "date"};
         try (Cursor cursor = getContentResolver().query(
-                uri, projection, null, null, "date DESC LIMIT 200")) {
+                uri, projection, null, null, "date DESC")) {
             if (cursor != null) {
-                while (cursor.moveToNext()) {
+                int count = 0;
+                while (cursor.moveToNext() && count < 200) {
                     String address = cursor.getString(0);
                     String body = cursor.getString(1);
                     long date = cursor.getLong(2);
                     items.add(new SmsAdapter.SmsItem(address, body, date));
+                    count++;
                 }
             }
         } catch (Exception e) {
             Toast.makeText(this, "SMS 읽기 실패", Toast.LENGTH_SHORT).show();
         }
+        items.sort((a, b) -> Long.compare(b.timestamp, a.timestamp));
         adapter.setItems(items);
     }
 
