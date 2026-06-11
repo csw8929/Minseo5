@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "yearInference": "recentPast",
+  "rules": [
+    {
+      "name": "하나 체크카드 승인",
+      "pattern": "하나[\\d*]+\\s*(?:체크승인)?\\s*차\\*서\\s*([\\d,]+)원\\s*(\\d{1,2})/(\\d{1,2})\\s+(\\d{1,2}):(\\d{2})\\s+(.+)",
+      "amountGroup": 1,
+      "monthGroup": 2,
+      "dayGroup": 3,
+      "purposeGroup": 6
+    }
+  ]
+}
