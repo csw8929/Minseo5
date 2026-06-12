@@ -1,5 +1,6 @@
 package com.example.minseo5;
 
+import android.content.ClipboardManager;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Environment;
@@ -173,11 +174,29 @@ public class MainActivity extends AppCompatActivity {
     private void showAddOptions() {
         new AlertDialog.Builder(this)
                 .setTitle("추가 방법 선택")
-                .setItems(new CharSequence[]{"문자에서 가져오기", "직접 입력"}, (dialog, which) -> {
+                .setItems(new CharSequence[]{"문자에서 가져오기", "복사된 항목 가져오기", "직접 입력"}, (dialog, which) -> {
                     if (which == 0) openMessagingApp();
+                    else if (which == 1) importFromClipboard();
                     else openManualEntry();
                 })
                 .show();
+    }
+
+    private void importFromClipboard() {
+        ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (cm == null || !cm.hasPrimaryClip() || cm.getPrimaryClip() == null
+                || cm.getPrimaryClip().getItemCount() == 0) {
+            Toast.makeText(this, "복사된 텍스트가 없습니다", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        CharSequence text = cm.getPrimaryClip().getItemAt(0).coerceToText(this);
+        if (text == null || text.toString().trim().isEmpty()) {
+            Toast.makeText(this, "복사된 텍스트가 없습니다", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Intent target = new Intent(this, SmsPickerActivity.class);
+        target.putExtra(SmsPickerActivity.EXTRA_RAW_TEXT, text.toString());
+        smsPickerLauncher.launch(target);
     }
 
     private void openMessagingApp() {
