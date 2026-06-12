@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "yearInference": "recentPast",
   "rules": [
     {
@@ -8,6 +8,8 @@
       "amountGroup": 1,
       "monthGroup": 2,
       "dayGroup": 3,
+      "hourGroup": 4,
+      "minGroup": 5,
       "purposeGroup": 6
     }
   ]

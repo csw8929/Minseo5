@@ -5,7 +5,7 @@ import androidx.room.Database;
 import androidx.room.Room;
 import androidx.room.RoomDatabase;
 
-@Database(entities = {SpendingRecord.class}, version = 1)
+@Database(entities = {SpendingRecord.class}, version = 2)
 public abstract class SpendingDatabase extends RoomDatabase {
 
     private static volatile SpendingDatabase instance;
@@ -20,7 +20,9 @@ public abstract class SpendingDatabase extends RoomDatabase {
                             context.getApplicationContext(),
                             SpendingDatabase.class,
                             "spending.db"
-                    ).allowMainThreadQueries().build();
+                    ).allowMainThreadQueries()
+                            .fallbackToDestructiveMigration()
+                            .build();
                 }
             }
         }
