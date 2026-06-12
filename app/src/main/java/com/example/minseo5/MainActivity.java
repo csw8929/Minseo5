@@ -2,6 +2,7 @@ package com.example.minseo5;
 
 import android.content.ClipboardManager;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Environment;
 import android.provider.Settings;
@@ -16,6 +17,8 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -74,11 +77,12 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        applySystemBarIconColors();
+
         dao = SpendingDatabase.getInstance(this).spendingDao();
         currentMonth = Calendar.getInstance();
 
         toolbar = findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar);
         toolbar.setOnMenuItemClickListener(this::onMenuItemClick);
 
         tvMonth = findViewById(R.id.tv_month);
@@ -134,6 +138,15 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void applySystemBarIconColors() {
+        WindowInsetsControllerCompat controller =
+                WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+        boolean lightBackground = (getResources().getConfiguration().uiMode
+                & Configuration.UI_MODE_NIGHT_MASK) != Configuration.UI_MODE_NIGHT_YES;
+        controller.setAppearanceLightStatusBars(lightBackground);
+        controller.setAppearanceLightNavigationBars(lightBackground);
+    }
+
     private void ensureStorageAccess() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return;
         if (Environment.isExternalStorageManager()) return;
@@ -182,7 +195,7 @@ public class MainActivity extends AppCompatActivity {
         List<SpendingRecord> records = dao.getByMonth(prefix);
         long total = dao.getMonthTotal(prefix);
         adapter.setItems(records);
-        tvTotal.setText(String.format(Locale.KOREA, "합계: %,d원", total));
+        tvTotal.setText(String.format(Locale.KOREA, "%,d원", total));
     }
 
     private void showAddOptions() {
@@ -239,6 +252,13 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean onMenuItemClick(MenuItem item) {
         int id = item.getItemId();
+        if (id == R.id.menu_stats) {
+            Intent intent = new Intent(this, StatsActivity.class);
+            intent.putExtra(StatsActivity.EXTRA_MONTH,
+                    new SimpleDateFormat("yyyy-MM", Locale.KOREA).format(currentMonth.getTime()));
+            startActivity(intent);
+            return true;
+        }
         if (id == R.id.menu_export) {
             String filename = new SimpleDateFormat("yyyyMM", Locale.KOREA)
                     .format(currentMonth.getTime()) + "_용돈기록.json";
