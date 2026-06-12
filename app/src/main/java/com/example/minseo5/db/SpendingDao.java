@@ -20,6 +20,11 @@ public interface SpendingDao {
     @Query("SELECT COUNT(*) FROM spending WHERE usedDate = :usedDate AND amount = :amount AND purpose = :purpose")
     int countDuplicate(String usedDate, long amount, String purpose);
 
+    @Query("SELECT COUNT(*) FROM spending WHERE usedDate = :usedDate "
+            + "AND IFNULL(usedTime, '') = IFNULL(:usedTime, '') "
+            + "AND amount = :amount AND IFNULL(purpose, '') = IFNULL(:purpose, '')")
+    int countDup(String usedDate, String usedTime, long amount, String purpose);
+
     @Query("SELECT * FROM spending ORDER BY usedDate DESC, id DESC")
     List<SpendingRecord> getAll();
 

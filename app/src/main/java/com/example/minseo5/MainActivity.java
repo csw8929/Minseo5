@@ -41,6 +41,8 @@ public class MainActivity extends AppCompatActivity {
     private SpendingAdapter adapter;
     private Calendar currentMonth;
     private TextView tvMonth, tvTotal;
+    private MaterialToolbar toolbar;
+    private boolean selectionMode = false;
 
     private final ActivityResultLauncher<String> exportLauncher =
             registerForActivityResult(new ActivityResultContracts.CreateDocument("application/json"), uri -> {
@@ -75,7 +77,7 @@ public class MainActivity extends AppCompatActivity {
         dao = SpendingDatabase.getInstance(this).spendingDao();
         currentMonth = Calendar.getInstance();
 
-        MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         toolbar.setOnMenuItemClickListener(this::onMenuItemClick);
 
@@ -84,7 +86,24 @@ public class MainActivity extends AppCompatActivity {
 
         RecyclerView rv = findViewById(R.id.rv_spending);
         rv.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new SpendingAdapter(this::onSpendingClicked);
+        adapter = new SpendingAdapter(new SpendingAdapter.Listener() {
+            @Override
+            public void onItemClick(SpendingRecord record) {
+                if (selectionMode) {
+                    adapter.toggle(record);
+                    updateSelectionTitle();
+                } else {
+                    onSpendingClicked(record);
+                }
+            }
+
+            @Override
+            public void onItemLongClick(SpendingRecord record) {
+                if (!selectionMode) enterSelectionMode();
+                adapter.select(record);
+                updateSelectionTitle();
+            }
+        });
         rv.setAdapter(adapter);
 
         findViewById(R.id.btn_prev_month).setOnClickListener(v -> {
@@ -230,7 +249,77 @@ public class MainActivity extends AppCompatActivity {
             importLauncher.launch(new String[]{"application/json", "*/*"});
             return true;
         }
+        if (id == R.id.menu_sum) {
+            showSumDialog();
+            return true;
+        }
         return false;
+    }
+
+    private void enterSelectionMode() {
+        selectionMode = true;
+        adapter.setSelectionMode(true);
+        toolbar.setNavigationIcon(R.drawable.ic_arrow_back);
+        toolbar.setNavigationOnClickListener(v -> exitSelectionMode());
+        toolbar.getMenu().clear();
+        toolbar.inflateMenu(R.menu.selection_menu);
+        toolbar.setOnMenuItemClickListener(this::onMenuItemClick);
+    }
+
+    private void exitSelectionMode() {
+        selectionMode = false;
+        adapter.setSelectionMode(false);
+        adapter.clearSelection();
+        toolbar.setNavigationIcon(null);
+        toolbar.setNavigationOnClickListener(null);
+        toolbar.getMenu().clear();
+        toolbar.inflateMenu(R.menu.main_menu);
+        toolbar.setOnMenuItemClickListener(this::onMenuItemClick);
+        toolbar.setTitle("용돈 기록");
+    }
+
+    private void updateSelectionTitle() {
+        toolbar.setTitle(adapter.getSelectedCount() + "개 선택");
+    }
+
+    private void showSumDialog() {
+        List<SpendingRecord> selected = adapter.getSelectedRecords();
+        if (selected.isEmpty()) {
+            Toast.makeText(this, "선택된 항목이 없습니다", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        long total = 0;
+        for (SpendingRecord r : selected) total += r.amount;
+
+        RecyclerView rv = (RecyclerView) getLayoutInflater()
+                .inflate(R.layout.dialog_sum, null);
+        rv.setLayoutManager(new LinearLayoutManager(this));
+        SpendingAdapter sumAdapter = new SpendingAdapter(new SpendingAdapter.Listener() {
+            @Override
+            public void onItemClick(SpendingRecord record) {
+            }
+
+            @Override
+            public void onItemLongClick(SpendingRecord record) {
+            }
+        });
+        sumAdapter.setItems(selected);
+        rv.setAdapter(sumAdapter);
+
+        new AlertDialog.Builder(this)
+                .setTitle(String.format(Locale.KOREA, "선택 합계: %,d원 (%d건)", total, selected.size()))
+                .setView(rv)
+                .setPositiveButton("닫기", null)
+                .show();
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (selectionMode) {
+            exitSelectionMode();
+            return;
+        }
+        super.onBackPressed();
     }
 
     private void exportData(Uri uri) {

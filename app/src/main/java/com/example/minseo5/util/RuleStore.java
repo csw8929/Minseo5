@@ -33,14 +33,15 @@ public class RuleStore {
     }
 
     private static RuleConfig load(Context context) {
+        RuleConfig def = loadAssets(context);
         RuleConfig external = loadExternal();
-        if (external != null && external.rules != null && !external.rules.isEmpty()) {
+        if (external != null && external.rules != null && !external.rules.isEmpty()
+                && external.version >= def.version) {
             Log.d("MINSEO5", "RuleStore: 외부 rules.json 사용 (" + external.rules.size() + "개)");
             return external;
         }
-        RuleConfig def = loadAssets(context);
         seedExternal(context);
-        Log.d("MINSEO5", "RuleStore: 기본(assets) rules.json 사용");
+        Log.d("MINSEO5", "RuleStore: 기본(assets) rules.json 사용/시드 (v" + def.version + ")");
         return def;
     }
 
@@ -73,7 +74,6 @@ public class RuleStore {
             File dir = new File(Environment.getExternalStoragePublicDirectory(
                     Environment.DIRECTORY_DOCUMENTS), DIR_NAME);
             File file = new File(dir, FILE_NAME);
-            if (file.exists()) return;
             if (!dir.exists() && !dir.mkdirs()) return;
             try (InputStream in = context.getAssets().open(FILE_NAME);
                  OutputStream out = new FileOutputStream(file)) {

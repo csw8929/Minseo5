@@ -15,6 +15,8 @@ public class RuleConfig {
         public int amountGroup;
         public int monthGroup;
         public int dayGroup;
+        public int hourGroup;
+        public int minGroup;
         public int purposeGroup;
     }
 }

@@ -33,7 +33,7 @@ public class SmsPickerActivity extends AppCompatActivity {
     public static final String RESULT_DATE = "result_date";
 
     private EditText etRaw;
-    private TextView tvResultCount;
+    private TextView tvResultCount, tvTotals, tvUnparsed;
     private RecyclerView rvResults;
     private Button btnApply;
     private ParseResultAdapter adapter;
@@ -54,6 +54,8 @@ public class SmsPickerActivity extends AppCompatActivity {
 
         etRaw = findViewById(R.id.et_raw);
         tvResultCount = findViewById(R.id.tv_result_count);
+        tvTotals = findViewById(R.id.tv_totals);
+        tvUnparsed = findViewById(R.id.tv_unparsed);
         rvResults = findViewById(R.id.rv_results);
         btnApply = findViewById(R.id.btn_apply);
 
@@ -98,30 +100,71 @@ public class SmsPickerActivity extends AppCompatActivity {
             return;
         }
         results = SmsParser.parseAll(this, text);
+        List<String> unparsed = SmsParser.findUnparsed(this, text);
+        showUnparsed(unparsed);
+
         if (results.isEmpty()) {
             tvResultCount.setText("파싱 결과 없음 (룰과 일치하는 내용 없음)");
             tvResultCount.setVisibility(View.VISIBLE);
+            tvTotals.setVisibility(View.GONE);
             rvResults.setVisibility(View.GONE);
             btnApply.setVisibility(View.GONE);
             return;
         }
+
+        long total = 0, uniqueTotal = 0;
+        int dupCount = 0;
+        java.util.HashSet<String> batchKeys = new java.util.HashSet<>();
+        for (SmsParser.ParseResult r : results) {
+            total += r.amount;
+            String purpose = r.purpose != null ? r.purpose : "";
+            String key = r.usedDate + "|" + (r.usedTime != null ? r.usedTime : "")
+                    + "|" + r.amount + "|" + purpose;
+            boolean dbDup = dao.countDup(r.usedDate, r.usedTime, r.amount, purpose) > 0;
+            boolean batchDup = !batchKeys.add(key);
+            r.duplicate = dbDup || batchDup;
+            if (r.duplicate) dupCount++;
+            else uniqueTotal += r.amount;
+        }
+
         adapter.setItems(results);
-        tvResultCount.setText("파싱 결과 " + results.size() + "건");
+        tvResultCount.setText("파싱 결과 " + results.size() + "건 (중복 " + dupCount + "건)");
+        tvTotals.setText(String.format(Locale.KOREA,
+                "합계: %,d원\n중복 제외(적용 대상): %,d원", total, uniqueTotal));
         tvResultCount.setVisibility(View.VISIBLE);
+        tvTotals.setVisibility(View.VISIBLE);
         rvResults.setVisibility(View.VISIBLE);
         btnApply.setVisibility(View.VISIBLE);
+    }
+
+    private void showUnparsed(List<String> unparsed) {
+        if (unparsed.isEmpty()) {
+            tvUnparsed.setVisibility(View.GONE);
+            return;
+        }
+        StringBuilder sb = new StringBuilder("⚠ 파싱 안 된 항목 " + unparsed.size() + "건:");
+        for (String u : unparsed) {
+            sb.append("\n• ").append(u.replace("\n", " "));
+        }
+        tvUnparsed.setText(sb.toString());
+        tvUnparsed.setVisibility(View.VISIBLE);
     }
 
     private void onApply() {
         if (results == null || results.isEmpty()) return;
 
         String now = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.KOREA).format(new Date());
-        int count = 0;
+        int count = 0, skipped = 0;
         String latestDate = null;
         for (SmsParser.ParseResult r : results) {
             if (r.amount <= 0 || r.usedDate == null) continue;
+            if (r.duplicate) {
+                skipped++;
+                continue;
+            }
             SpendingRecord record = new SpendingRecord();
             record.usedDate = r.usedDate;
+            record.usedTime = r.usedTime;
             record.amount = r.amount;
             record.purpose = r.purpose != null ? r.purpose : "";
             record.entryDate = now;
@@ -130,7 +173,8 @@ public class SmsPickerActivity extends AppCompatActivity {
             if (latestDate == null || r.usedDate.compareTo(latestDate) > 0) latestDate = r.usedDate;
         }
 
-        Toast.makeText(this, count + "건 적용됨", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, count + "건 적용됨" + (skipped > 0 ? " (중복 " + skipped + "건 제외)" : ""),
+                Toast.LENGTH_SHORT).show();
         if (latestDate != null) {
             Intent result = new Intent();
             result.putExtra(RESULT_DATE, latestDate);
