@@ -2,4 +2,18 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- 시안 브랜드 팔레트 (Material You) -->
+    <color name="brand_primary">#A7F3D0</color>
+    <color name="brand_secondary">#6EDE7F</color>
+    <color name="brand_tertiary">#FFF3C4</color>
+
+    <!-- 통계 히어로 카드 -->
+    <color name="hero_container">#A7F3D0</color>
+    <color name="hero_on_container">#0B3D2E</color>
+
+    <!-- 차트 강조 -->
+    <color name="chart_bar">#34A853</color>
+    <color name="expense_red">#E5484D</color>
+    <color name="income_green">#16A34A</color>
 </resources>

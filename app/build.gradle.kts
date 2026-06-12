@@ -52,6 +52,7 @@ dependencies {
     implementation(libs.activity)
     implementation(libs.constraintlayout)
     implementation(libs.recyclerview)
+    implementation(libs.mpandroidchart)
     implementation(libs.room.runtime)
     implementation(libs.gson)
     annotationProcessor(libs.room.compiler)

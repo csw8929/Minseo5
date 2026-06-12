@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 다크모드 변형 -->
+    <color name="hero_container">#1B4332</color>
+    <color name="hero_on_container">#D8F3DC</color>
+
+    <color name="chart_bar">#6EDE7F</color>
+    <color name="expense_red">#FF6B6F</color>
+    <color name="income_green">#5ED27F</color>
+</resources>

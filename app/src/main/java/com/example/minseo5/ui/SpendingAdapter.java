@@ -1,6 +1,7 @@
 package com.example.minseo5.ui;
 
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -12,6 +13,8 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.minseo5.R;
 import com.example.minseo5.db.SpendingRecord;
+import com.example.minseo5.util.CategoryColors;
+import com.example.minseo5.util.Categorizer;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -27,12 +30,13 @@ public class SpendingAdapter extends RecyclerView.Adapter<SpendingAdapter.VH> {
         void onItemLongClick(SpendingRecord record);
     }
 
-    private static final int SELECTED_COLOR = Color.parseColor("#E3F2FD");
+    private static final int SELECTED_COLOR = Color.parseColor("#DFF5E6");
 
     private List<SpendingRecord> items = new ArrayList<>();
     private final Listener listener;
     private boolean selectionMode = false;
     private final Set<Integer> selectedIds = new HashSet<>();
+    private Categorizer categorizer;
 
     public SpendingAdapter(Listener listener) {
         this.listener = listener;
@@ -94,7 +98,17 @@ public class SpendingAdapter extends RecyclerView.Adapter<SpendingAdapter.VH> {
         if (r.usedTime != null) date += " " + r.usedTime;
         holder.tvDate.setText(date);
         holder.tvAmount.setText(String.format(Locale.KOREA, "%,d원", r.amount));
-        holder.tvPurpose.setText(r.purpose != null ? r.purpose : "");
+        String purpose = r.purpose != null ? r.purpose : "";
+        holder.tvPurpose.setText(purpose);
+
+        if (categorizer == null) categorizer = Categorizer.of(holder.itemView.getContext());
+        String category = categorizer.categorize(purpose);
+        String letter = category.isEmpty() ? "?" : category.substring(0, 1);
+        holder.tvTile.setText(letter);
+        GradientDrawable tile = new GradientDrawable();
+        tile.setShape(GradientDrawable.OVAL);
+        tile.setColor(CategoryColors.colorFor(category));
+        holder.tvTile.setBackground(tile);
 
         if (selectionMode && selectedIds.contains(r.id)) {
             holder.itemView.setBackgroundColor(SELECTED_COLOR);
@@ -118,13 +132,14 @@ public class SpendingAdapter extends RecyclerView.Adapter<SpendingAdapter.VH> {
     }
 
     static class VH extends RecyclerView.ViewHolder {
-        final TextView tvDate, tvAmount, tvPurpose;
+        final TextView tvDate, tvAmount, tvPurpose, tvTile;
 
         VH(@NonNull View v) {
             super(v);
             tvDate = v.findViewById(R.id.tv_date);
             tvAmount = v.findViewById(R.id.tv_amount);
             tvPurpose = v.findViewById(R.id.tv_purpose);
+            tvTile = v.findViewById(R.id.tv_tile);
         }
     }
 }

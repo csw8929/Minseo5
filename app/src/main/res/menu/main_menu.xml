@@ -3,6 +3,11 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
+        android:id="@+id/menu_stats"
+        android:title="통계"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_export"
         android:title="내보내기"
         app:showAsAction="never" />
