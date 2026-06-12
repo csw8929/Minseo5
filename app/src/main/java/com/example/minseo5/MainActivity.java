@@ -26,7 +26,6 @@ import com.example.minseo5.ui.SpendingAdapter;
 import com.example.minseo5.ui.SpendingEntryDialog;
 import com.example.minseo5.util.JsonExportImport;
 import com.example.minseo5.util.RuleStore;
-import com.google.android.material.appbar.AppBarLayout;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
@@ -100,14 +99,10 @@ public class MainActivity extends AppCompatActivity {
         FloatingActionButton fab = findViewById(R.id.fab_add);
         fab.setOnClickListener(v -> showAddOptions());
 
-        AppBarLayout appBar = findViewById(R.id.appbar);
-        int fabMarginBase = getResources().getDimensionPixelSize(R.dimen.fab_margin);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             WindowInsets wi = getWindowManager().getCurrentWindowMetrics().getWindowInsets();
-            int top = wi.getInsets(WindowInsets.Type.statusBars()).top;
-            int bottom = wi.getInsets(WindowInsets.Type.navigationBars()).bottom;
-            appBar.setPadding(0, top, 0, 0);
-            fab.post(() -> fab.setTranslationY(-bottom));
+            android.graphics.Insets bars = wi.getInsets(WindowInsets.Type.systemBars());
+            findViewById(R.id.root_layout).setPadding(bars.left, bars.top, bars.right, bars.bottom);
         }
 
         loadData();
