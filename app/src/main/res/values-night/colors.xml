@@ -7,4 +7,5 @@
     <color name="chart_bar">#6EDE7F</color>
     <color name="expense_red">#FF6B6F</color>
     <color name="income_green">#5ED27F</color>
+    <color name="amount_blue">#64B5F6</color>
 </resources>

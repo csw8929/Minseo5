@@ -16,4 +16,5 @@
     <color name="chart_bar">#34A853</color>
     <color name="expense_red">#E5484D</color>
     <color name="income_green">#16A34A</color>
+    <color name="amount_blue">#1565C0</color>
 </resources>
