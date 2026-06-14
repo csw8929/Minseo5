@@ -27,6 +27,7 @@ import com.example.minseo5.db.SpendingDatabase;
 import com.example.minseo5.db.SpendingRecord;
 import com.example.minseo5.ui.SpendingAdapter;
 import com.example.minseo5.ui.SpendingEntryDialog;
+import com.example.minseo5.util.DataJsonStore;
 import com.example.minseo5.util.JsonExportImport;
 import com.example.minseo5.util.RuleStore;
 import com.google.android.material.appbar.MaterialToolbar;
@@ -183,9 +184,29 @@ public class MainActivity extends AppCompatActivity {
         intent.setAction(null);
         if (text == null || text.trim().isEmpty()) return;
 
+        saveRawToDataJson(text);
+
+        String combined = text;
+        if (SmsPickerActivity.pendingPrepend != null
+                && !SmsPickerActivity.pendingPrepend.trim().isEmpty()) {
+            combined = SmsPickerActivity.pendingPrepend + "\n\n" + text;
+        }
+        SmsPickerActivity.pendingPrepend = null;
+
         Intent target = new Intent(this, SmsPickerActivity.class);
-        target.putExtra(SmsPickerActivity.EXTRA_RAW_TEXT, text);
+        target.putExtra(SmsPickerActivity.EXTRA_RAW_TEXT, combined);
+        target.putExtra(SmsPickerActivity.EXTRA_FROM_SHARE, true);
         smsPickerLauncher.launch(target);
+    }
+
+    private void saveRawToDataJson(String raw) {
+        try {
+            List<String> raws = DataJsonStore.load(this);
+            raws.add(raw);
+            DataJsonStore.save(this, raws);
+        } catch (Exception e) {
+            Toast.makeText(this, "data.json 저장 실패: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
     }
 
     private void loadData() {
@@ -221,6 +242,7 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "복사된 텍스트가 없습니다", Toast.LENGTH_SHORT).show();
             return;
         }
+        saveRawToDataJson(text.toString());
         Intent target = new Intent(this, SmsPickerActivity.class);
         target.putExtra(SmsPickerActivity.EXTRA_RAW_TEXT, text.toString());
         smsPickerLauncher.launch(target);

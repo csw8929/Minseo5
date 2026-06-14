@@ -18,7 +18,6 @@ import com.example.minseo5.db.SpendingDao;
 import com.example.minseo5.db.SpendingDatabase;
 import com.example.minseo5.db.SpendingRecord;
 import com.example.minseo5.ui.ParseResultAdapter;
-import com.example.minseo5.util.DataJsonStore;
 import com.example.minseo5.util.SmsParser;
 import com.google.android.material.appbar.MaterialToolbar;
 
@@ -30,10 +29,14 @@ import java.util.Locale;
 public class SmsPickerActivity extends AppCompatActivity {
 
     public static final String EXTRA_RAW_TEXT = "raw_text";
+    public static final String EXTRA_FROM_SHARE = "from_share";
     public static final String RESULT_DATE = "result_date";
 
+    // "추가 입력"으로 문자앱에 다녀오는 동안 보관할 기존 내용. 다음 공유 시 앞에 이어붙임.
+    public static String pendingPrepend;
+
     private EditText etRaw;
-    private TextView tvResultCount, tvTotals, tvUnparsed;
+    private TextView tvResultCount, tvTotals, tvUniqueTotal, tvUnparsed;
     private RecyclerView rvResults;
     private Button btnApply;
     private ParseResultAdapter adapter;
@@ -55,9 +58,15 @@ public class SmsPickerActivity extends AppCompatActivity {
         etRaw = findViewById(R.id.et_raw);
         tvResultCount = findViewById(R.id.tv_result_count);
         tvTotals = findViewById(R.id.tv_totals);
+        tvUniqueTotal = findViewById(R.id.tv_unique_total);
         tvUnparsed = findViewById(R.id.tv_unparsed);
         rvResults = findViewById(R.id.rv_results);
         btnApply = findViewById(R.id.btn_apply);
+        Button btnAddMore = findViewById(R.id.btn_add_more);
+        if (getIntent().getBooleanExtra(EXTRA_FROM_SHARE, false)) {
+            btnAddMore.setVisibility(View.VISIBLE);
+            btnAddMore.setOnClickListener(v -> onAddMore());
+        }
 
         rvResults.setLayoutManager(new LinearLayoutManager(this));
         adapter = new ParseResultAdapter();
@@ -78,18 +87,21 @@ public class SmsPickerActivity extends AppCompatActivity {
         String raw = getIntent().getStringExtra(EXTRA_RAW_TEXT);
         if (raw != null) {
             etRaw.setText(raw);
-            if (savedInstanceState == null) saveRaw(raw);
         }
     }
 
-    private void saveRaw(String raw) {
-        try {
-            List<String> raws = DataJsonStore.load(this);
-            raws.add(raw);
-            DataJsonStore.save(this, raws);
-            Toast.makeText(this, "원문 저장됨 (data.json)", Toast.LENGTH_SHORT).show();
-        } catch (Exception e) {
-            Toast.makeText(this, "data.json 저장 실패: " + e.getMessage(), Toast.LENGTH_LONG).show();
+    private void onAddMore() {
+        pendingPrepend = etRaw.getText().toString();
+        Intent intent = new Intent(Intent.ACTION_MAIN);
+        intent.addCategory(Intent.CATEGORY_APP_MESSAGING);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        if (intent.resolveActivity(getPackageManager()) != null) {
+            Toast.makeText(this, "메시지를 공유하면 기존 내용에 이어집니다", Toast.LENGTH_LONG).show();
+            startActivity(intent);
+            finish();
+        } else {
+            Toast.makeText(this, "메시지 앱을 찾을 수 없습니다", Toast.LENGTH_SHORT).show();
+            pendingPrepend = null;
         }
     }
 
@@ -107,6 +119,7 @@ public class SmsPickerActivity extends AppCompatActivity {
             tvResultCount.setText("파싱 결과 없음 (룰과 일치하는 내용 없음)");
             tvResultCount.setVisibility(View.VISIBLE);
             tvTotals.setVisibility(View.GONE);
+            tvUniqueTotal.setVisibility(View.GONE);
             rvResults.setVisibility(View.GONE);
             btnApply.setVisibility(View.GONE);
             return;
@@ -129,10 +142,11 @@ public class SmsPickerActivity extends AppCompatActivity {
 
         adapter.setItems(results);
         tvResultCount.setText("파싱 결과 " + results.size() + "건 (중복 " + dupCount + "건)");
-        tvTotals.setText(String.format(Locale.KOREA,
-                "합계: %,d원\n중복 제외(적용 대상): %,d원", total, uniqueTotal));
+        tvTotals.setText(String.format(Locale.KOREA, "합계: %,d원", total));
+        tvUniqueTotal.setText(String.format(Locale.KOREA, "중복 제외 최종: %,d원", uniqueTotal));
         tvResultCount.setVisibility(View.VISIBLE);
         tvTotals.setVisibility(View.VISIBLE);
+        tvUniqueTotal.setVisibility(View.VISIBLE);
         rvResults.setVisibility(View.VISIBLE);
         btnApply.setVisibility(View.VISIBLE);
     }
